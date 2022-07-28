@@ -7,6 +7,7 @@
 #include "freertos/task.h"
 #include <string.h>
 
+#define WIFI_CONNECT_RETRY_ATTEMPT     5
 #define WIFI_GROUP_EVENT_BIT_CONNECTED BIT0
 #define WIFI_GROUP_EVENT_BIT_FAIL      BIT1
 
@@ -20,6 +21,7 @@ struct wifi_t
 {
     EventGroupHandle_t wifi_group_events;
     esp_netif_t*       esp_netif;
+    uint32_t           retry_count;
     bool               initialized;
 };
 
@@ -118,6 +120,8 @@ wifi_err_t wifi_connect_sta(char* ssid, char* password)
     esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
     esp_wifi_start();
 
+    wifi.retry_count = 0;
+
     /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
      * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */
     EventBits_t bits =
@@ -170,7 +174,16 @@ static void wifi_event_any_id_cb(void* event_handler_arg, esp_event_base_t event
         break;
 
     case WIFI_EVENT_STA_DISCONNECTED:
-        xEventGroupSetBits(wifi.wifi_group_events, WIFI_GROUP_EVENT_BIT_FAIL);
+        if (wifi.retry_count < WIFI_CONNECT_RETRY_ATTEMPT)
+        {
+            wifi.retry_count++;
+            esp_wifi_connect();
+            ESP_LOGI(__FUNCTION__, "retry to connect to the AP");
+        }
+        else
+        {
+            xEventGroupSetBits(wifi.wifi_group_events, WIFI_GROUP_EVENT_BIT_FAIL);
+        }
         break;
     default:
         break;
