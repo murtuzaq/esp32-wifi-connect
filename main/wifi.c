@@ -19,10 +19,12 @@ struct type_info_t
 
 struct wifi_t
 {
-    EventGroupHandle_t wifi_group_events;
-    esp_netif_t*       esp_netif;
-    uint32_t           retry_count;
-    bool               initialized;
+    EventGroupHandle_t           wifi_group_events;
+    esp_netif_t*                 esp_netif;
+    esp_event_handler_instance_t instance_any_id;
+    esp_event_handler_instance_t instance_got_ip;
+    uint32_t                     retry_count;
+    bool                         initialized;
 };
 
 static struct wifi_t wifi;
@@ -93,12 +95,10 @@ wifi_err_t wifi_connect_sta(char* ssid, char* password)
 
     wifi.wifi_group_events = xEventGroupCreate();
 
-    esp_event_handler_instance_t instance_any_id;
-    esp_event_handler_instance_t instance_got_ip;
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_any_id_cb, NULL,
-                                                        &instance_any_id));
+                                                        &wifi.instance_any_id));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &ip_event_sta_got_ip_cb, NULL,
-                                                        &instance_got_ip));
+                                                        &wifi.instance_got_ip));
 
     wifi.esp_netif = esp_netif_create_default_wifi_sta();
 
@@ -134,11 +134,6 @@ wifi_err_t wifi_connect_sta(char* ssid, char* password)
         wifi_err = WIFI_ERROR;
     }
 
-    /* The event will not be processed after unregister */
-    esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, instance_got_ip);
-    esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, instance_any_id);
-    vEventGroupDelete(wifi.wifi_group_events);
-
     return wifi_err;
 }
 
@@ -148,6 +143,13 @@ wifi_err_t wifi_connect_ap(char* ssid, char* password)
     {
         return WIFI_ERROR;
     }
+
+    wifi.wifi_group_events = xEventGroupCreate();
+
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_any_id_cb, NULL,
+                                                        &wifi.instance_any_id));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &ip_event_sta_got_ip_cb, NULL,
+                                                        &wifi.instance_got_ip));
 
     wifi_config_t wifi_config;
     memset(&wifi_config, 0, sizeof(wifi_config_t));
@@ -172,6 +174,11 @@ void wifi_disconnect(void)
     esp_wifi_disconnect();
     esp_wifi_stop();
     esp_netif_destroy(wifi.esp_netif);
+
+    /* The event will not be processed after unregister */
+    esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, wifi.instance_got_ip);
+    esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi.instance_any_id);
+    vEventGroupDelete(wifi.wifi_group_events);
     return;
 }
 
