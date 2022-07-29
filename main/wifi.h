@@ -11,6 +11,7 @@ typedef enum
 void       wifi_init(void);
 void       wifi_scan(void);
 wifi_err_t wifi_connect_sta(char* ssid, char* password);
+wifi_err_t wifi_connect_ap(char* ssid, char* password);
 void       wifi_disconnect(void);
 
 #endif

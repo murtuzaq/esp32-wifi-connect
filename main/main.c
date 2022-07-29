@@ -9,8 +9,20 @@ void task_wifi_connect(void* params);
 void app_main(void)
 {
     nvs_flash_init();
+    wifi_init();
+    wifi_connect_ap("esp32-wifi", "password");
 
-    xTaskCreate(task_wifi_connect, "task_wifi_connect", 5 * 1025, NULL, 5, NULL);
+    for (int i = 20; i > 0; i--)
+    {
+        vTaskDelay(100);
+        ESP_LOGI(__FUNCTION__, "disconnecting wifi in %d seconds", i);
+    }
+
+    wifi_disconnect();
+
+    ESP_LOGI(__FUNCTION__, "reconnecting wifi ap mode");
+
+    wifi_connect_ap("esp32-wifi", "password");
 }
 
 void task_wifi_connect(void* params)

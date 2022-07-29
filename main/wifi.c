@@ -108,13 +108,9 @@ wifi_err_t wifi_connect_sta(char* ssid, char* password)
     strncpy((char*)&wifi_config.sta.ssid, ssid, sizeof(wifi_config.sta.ssid) - 1);
     strncpy((char*)&wifi_config.sta.password, password, sizeof(wifi_config.sta.password) - 1);
 
-    /* Setting a password implies station will connect to all security modes including WEP/WPA.
-     * However these modes are deprecated and not advisable to be used. Incase your Access point
-     * doesn't support WPA2, these mode can be enabled by commenting below line */
     wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
-
-    wifi_config.sta.pmf_cfg.capable  = true;
-    wifi_config.sta.pmf_cfg.required = false;
+    wifi_config.sta.pmf_cfg.capable    = true;
+    wifi_config.sta.pmf_cfg.required   = false;
 
     esp_wifi_set_mode(WIFI_MODE_STA);
     esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
@@ -122,8 +118,6 @@ wifi_err_t wifi_connect_sta(char* ssid, char* password)
 
     wifi.retry_count = 0;
 
-    /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
-     * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */
     EventBits_t bits =
         xEventGroupWaitBits(wifi.wifi_group_events, WIFI_GROUP_EVENT_BIT_CONNECTED | WIFI_GROUP_EVENT_BIT_FAIL, pdTRUE,
                             pdFALSE, portMAX_DELAY);
@@ -146,6 +140,31 @@ wifi_err_t wifi_connect_sta(char* ssid, char* password)
     vEventGroupDelete(wifi.wifi_group_events);
 
     return wifi_err;
+}
+
+wifi_err_t wifi_connect_ap(char* ssid, char* password)
+{
+    if (wifi.initialized == false)
+    {
+        return WIFI_ERROR;
+    }
+
+    wifi_config_t wifi_config;
+    memset(&wifi_config, 0, sizeof(wifi_config_t));
+
+    strncpy((char*)&wifi_config.ap.ssid, ssid, sizeof(wifi_config.ap.ssid) - 1);
+    strncpy((char*)&wifi_config.ap.password, password, sizeof(wifi_config.ap.password) - 1);
+
+    wifi_config.ap.authmode        = WIFI_AUTH_WPA_WPA2_PSK;
+    wifi_config.ap.max_connection  = ESP_WIFI_MAX_CONN_NUM;
+    wifi_config.ap.beacon_interval = 100;
+
+    wifi.esp_netif = esp_netif_create_default_wifi_ap();
+    esp_wifi_set_mode(WIFI_MODE_AP);
+    esp_wifi_set_config(WIFI_IF_AP, &wifi_config);
+    esp_wifi_start();
+
+    return WIFI_OK;
 }
 
 void wifi_disconnect(void)
